@@ -80,7 +80,7 @@ app.put('/api/persons/:id', (request, response, next) => {
 app.delete('/api/persons/:id', (request, response, next) => {
     Person.findByIdAndRemove(request.params.id)
         .then(result => {
-            response.status(204).end()
+            response.status(200).end()
         })
         .catch(error => next(error))
 })
