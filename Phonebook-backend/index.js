@@ -15,7 +15,7 @@ app.get('/', (request, response) => {
     response.send('<h1>Hello World!</h1>')
 })
 
-app.get('/info', (request, response) => {
+app.get('/info', (request, response, next) => {
     Person.find({})
         .then(persons => {
             response.send("<div>" +
@@ -26,7 +26,7 @@ app.get('/info', (request, response) => {
         .catch(error => next(error))
 })
 
-app.get('/api/persons', (request, response) => {
+app.get('/api/persons', (request, response, next) => {
     Person.find({})
         .then(persons => {
             response.json(persons.map(person => person.toJSON()))
@@ -46,33 +46,20 @@ app.get('/api/persons/:id', (request, response, next) => {
         .catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', async (request, response, next) => {
     const body = request.body
-
-    if (body.name === undefined) {
-        return response.status(400).json({
-            error: 'name missing'
-        })
-    } else if (body.number === undefined) {
-        return response.status(400).json({
-            error: 'number missing'
-        })
-    } else if (await Person.findOne({'name' : body.name}) !== null){
-        return response.status(400).json({
-            error: 'name must be unique'
-        })
-    }
 
     const person = new Person({
         name: body.name,
-        number: body.number,
-        id: Math.floor(Math.random() * 99999)
+        number: body.number
     })
 
-    person.save().then(savedPerson => savedPerson.toJSON())
+    person.save()
+        .then(savedPerson => savedPerson.toJSON())
         .then(formattedPerson => {
             response.json(formattedPerson)
-        }).catch(error => next(error))
+        })
+        .catch(error => next(error))
 })
 
 app.put('/api/persons/:id', (request, response, next) => {
@@ -83,7 +70,7 @@ app.put('/api/persons/:id', (request, response, next) => {
         number: body.number
     })
 
-    Person.findByIdAndUpdate(request.params.id, person, { new: true })
+    Person.findByIdAndUpdate(request.params.id, person, { runValidators: true, context: 'query', new: true })
         .then(updatedPerson => {
             response.json(updatedPerson.toJSON())
         })
@@ -109,6 +96,27 @@ const errorHandler = (error, request, response, next) => {
     console.error(error.message)
     if (error.name === 'CastError' && error.path === '_id') {
         return response.status(400).send({ error: 'malformatted id' })
+    } else if (error.name === 'ValidationError') {
+        console.log(error)
+        if (error.errors.name) {
+            if (error.errors.name.kind === 'minlength') {
+                return response.status(400).json({ error: 'Name is too short' })
+            } else if (error.errors.name.kind === 'required') {
+                return response.status(400).json({ error: 'Name is required' })
+            }else if(error.errors.name.kind === 'unique'){
+                return response.status(400).json({ error: 'Name must be unique' })
+            }
+
+        } else if (error.errors.number) {
+            if (error.errors.number.kind === 'minlength') {
+                return response.status(400).json({ error: 'Number is too short' })
+            } else if (error.errors.number.kind === 'required') {
+                return response.status(400).json({ error: 'Number is required' })
+            }
+        }
+        else {
+            return response.status(400).json({ error: error.message })
+        }
     }
 
     next(error)
