@@ -72,7 +72,11 @@ app.put('/api/persons/:id', (request, response, next) => {
 
     Person.findByIdAndUpdate(request.params.id, person, { runValidators: true, context: 'query', new: true })
         .then(updatedPerson => {
-            response.json(updatedPerson.toJSON())
+            if (updatedPerson) {
+                response.json(updatedPerson.toJSON())
+            } else {
+                response.status(404).json({ error: `${person.name} has already been deleted` })
+            }
         })
         .catch(error => next(error))
 })
@@ -103,7 +107,7 @@ const errorHandler = (error, request, response, next) => {
                 return response.status(400).json({ error: 'Name is too short' })
             } else if (error.errors.name.kind === 'required') {
                 return response.status(400).json({ error: 'Name is required' })
-            }else if(error.errors.name.kind === 'unique'){
+            } else if (error.errors.name.kind === 'unique') {
                 return response.status(400).json({ error: 'Name must be unique' })
             }
 
